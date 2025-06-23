@@ -30,6 +30,35 @@ using namespace SDK;
 // Basic.cpp was added to the VS project
 // Engine_functions.cpp was added to the VS project
 
+bool bBotsSpawned = false;
+
+void SpawnInitialBots()
+{
+    UWorld* World = UWorld::GetWorld();
+    APlayerController* PC = UGameplayStatics::GetPlayerController(World, 0);
+    if (!PC)
+        return;
+
+    UTslCheatManager* Cheat = static_cast<UTslCheatManager*>(PC->CheatManager);
+    if (!Cheat)
+        return;
+
+    ATslGameMode* GM = static_cast<ATslGameMode*>(UGameplayStatics::GetGameMode(World));
+    if (GM)
+    {
+        GM->bEnablePerfBotLogin = true;
+        GM->bEnablePerfBotInPIE = true;
+        GM->bIsPerfBotSpawnToRandomPosition = true;
+        GM->bCanRestartPerfBot = true;
+    }
+
+    for (int i = 0; i < 10; ++i)
+    {
+        Cheat->SpawnBot();
+    }
+    bBotsSpawned = true;
+}
+
 
 void DisableCullingForAllActors(UWorld* World) // Function half made by ChatGPT half made by me that saved my ass completely
 {
@@ -150,6 +179,16 @@ void* ProcessEventHook(UObject* Obj, UFunction* Func, void* Func_Params)
             {
                 __fastfail(0);
                 TerminateProcess(GetCurrentProcess(), 0);
+            }
+        }
+
+        if (FuncName == "K2_PostLogin")
+        {
+            auto Parms = static_cast<Params::GameModeBase_K2_PostLogin*>(Func_Params);
+            ATslGameState* GS = static_cast<ATslGameState*>(UGameplayStatics::GetGameState(UWorld::GetWorld()));
+            if (GS && GS->NumJoinPlayers == 1 && !bBotsSpawned)
+            {
+                SpawnInitialBots();
             }
         }
 
