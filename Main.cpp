@@ -35,14 +35,10 @@ bool bBotsSpawned = false;
 void SpawnInitialBots()
 {
     UWorld* World = UWorld::GetWorld();
-    APlayerController* PC = UGameplayStatics::GetPlayerController(World, 0);
-    if (!PC)
+    if (!World)
         return;
 
-    UTslCheatManager* Cheat = static_cast<UTslCheatManager*>(PC->CheatManager);
-    if (!Cheat)
-        return;
-
+    // Enable perf-bot settings so the engine treats these extra controllers as bots
     ATslGameMode* GM = static_cast<ATslGameMode*>(UGameplayStatics::GetGameMode(World));
     if (GM)
     {
@@ -52,10 +48,17 @@ void SpawnInitialBots()
         GM->bCanRestartPerfBot = true;
     }
 
-    for (int i = 0; i < 10; ++i)
+    UGameInstance* GI = World->OwningGameInstance;
+    if (!GI)
+        return;
+
+    // Spawn 10 local players using the debug create player command.
+    // This mimics additional human players and ensures proper controller and pawn setup.
+    for (int i = 1; i <= 10; ++i)
     {
-        Cheat->SpawnBot();
+        GI->DebugCreatePlayer(i);
     }
+
     bBotsSpawned = true;
 }
 
