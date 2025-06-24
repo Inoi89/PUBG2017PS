@@ -72,6 +72,21 @@ void SpawnInitialBots()
         return;
     }
 
+    UGameInstance* GI = UGameplayStatics::GetGameInstance(World);
+    if (GI)
+    {
+        for (int i = 0; i < 10; ++i)
+        {
+            int32 ControllerId = i + 1; // avoid 0 which belongs to the real player
+            GI->DebugCreatePlayer(ControllerId);
+            CUSTOMLOG("SpawnInitialBots: DebugCreatePlayer for ControllerId " + std::to_string(ControllerId));
+        }
+    }
+    else
+    {
+        CUSTOMLOG("SpawnInitialBots: GameInstance not found for DebugCreatePlayer");
+    }
+
     for (int i = 0; i < 10; ++i)
     {
         Cheat->SpawnBot();
