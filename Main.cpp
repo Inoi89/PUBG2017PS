@@ -34,32 +34,52 @@ bool bBotsSpawned = false;
 
 void SpawnInitialBots()
 {
+    CUSTOMLOG("SpawnInitialBots() called");
+
     UWorld* World = UWorld::GetWorld();
     if (!World)
+    {
+        CUSTOMLOG("SpawnInitialBots: World is null");
         return;
+    }
 
     // Enable perf-bot settings so the engine treats these extra controllers as bots
     ATslGameMode* GM = static_cast<ATslGameMode*>(UGameplayStatics::GetGameMode(World));
     if (GM)
     {
+        CUSTOMLOG("SpawnInitialBots: enabling perf bot flags");
         GM->bEnablePerfBotLogin = true;
         GM->bEnablePerfBotInPIE = true;
         GM->bIsPerfBotSpawnToRandomPosition = true;
         GM->bCanRestartPerfBot = true;
     }
-
-    UGameInstance* GI = World->OwningGameInstance;
-    if (!GI)
-        return;
-
-    // Spawn 10 local players using the debug create player command.
-    // This mimics additional human players and ensures proper controller and pawn setup.
-    for (int i = 1; i <= 10; ++i)
+    else
     {
-        GI->DebugCreatePlayer(i);
+        CUSTOMLOG("SpawnInitialBots: GameMode not found");
+    }
+
+    APlayerController* PC = UGameplayStatics::GetPlayerController(World, 0);
+    if (!PC)
+    {
+        CUSTOMLOG("SpawnInitialBots: PlayerController not found");
+        return;
+    }
+
+    UTslCheatManager* Cheat = static_cast<UTslCheatManager*>(PC->CheatManager);
+    if (!Cheat)
+    {
+        CUSTOMLOG("SpawnInitialBots: CheatManager not found");
+        return;
+    }
+
+    for (int i = 0; i < 10; ++i)
+    {
+        Cheat->SpawnBot();
+        CUSTOMLOG("SpawnInitialBots: spawned bot " + std::to_string(i + 1));
     }
 
     bBotsSpawned = true;
+    CUSTOMLOG("SpawnInitialBots: finished spawning bots");
 }
 
 
