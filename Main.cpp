@@ -186,7 +186,11 @@ void* ProcessEventHook(UObject* Obj, UFunction* Func, void* Func_Params)
         {
             auto Parms = static_cast<Params::GameModeBase_K2_PostLogin*>(Func_Params);
             ATslGameState* GS = static_cast<ATslGameState*>(UGameplayStatics::GetGameState(UWorld::GetWorld()));
-            if (GS && GS->NumJoinPlayers == 1 && !bBotsSpawned)
+            if (GS)
+            {
+                CUSTOMLOG("Current NumJoinPlayers: " + std::to_string(GS->NumJoinPlayers));
+            }
+            if (GS && GS->NumJoinPlayers >= 1 && !bBotsSpawned)
             {
                 SpawnInitialBots();
             }
