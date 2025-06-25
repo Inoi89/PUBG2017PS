@@ -25,6 +25,11 @@ FNameAvailablie = false
 GameStarted = false
 GameEnded = false
 
+-- Number of bots we try to spawn when the server starts
+BotsToSpawn = 10
+-- Tracks if we already attempted to spawn bots
+BotsSpawned = false
+
 Debug = true
 
 ZERO_VECTOR = {
@@ -176,15 +181,18 @@ function Init()
                         local serverPlayer = FindFirstOf("TslPlayerController")
                         if serverPlayer:IsValid() and serverPlayer:HasAuthority() then
                             print("We are a server, continue to do our stuff")
-                            GlobalTransportAirplane = SpawnAircraft()
-                            GlobalTransportAirplane:EnterAtEjectionArea()
-                            -- SpawnTestingPlayerPawn()
+                        GlobalTransportAirplane = SpawnAircraft()
+                        GlobalTransportAirplane:EnterAtEjectionArea()
+                        -- attempt to spawn bots once the plane exists
+                        SpawnBots(serverPlayer)
 
                             LoopAsync(
                                 100,
                                 function()
-                                    -- print("Spawning Bot...")
-                                    -- serverPlayer.CheatManager:SpawnBot()
+                                    -- try spawning bots if it hasn't been done
+                                    if not BotsSpawned then
+                                        SpawnBots(serverPlayer)
+                                    end
                                     if (GameState ~= nil) then
                                         if (GameState.TotalWarningDuration ~= 0) then
                                             if (GameState.TotalWarningDuration ~= LastWarningTime) then
@@ -428,6 +436,49 @@ function SpawnAircraft()
     else
         print("GameMode is nil")
         return nil
+    end
+end
+
+-- Spawn a number of bots using different methods
+function SpawnBots(controller)
+    if BotsSpawned then return end
+    if not controller or not controller:IsValid() then
+        print("SpawnBots: controller invalid")
+        return
+    end
+
+    local spawned = 0
+
+    if controller.CheatManager and controller.CheatManager:IsValid() then
+        for i = 1, BotsToSpawn do
+            local ok, err = pcall(function()
+                controller.CheatManager:SpawnBot()
+            end)
+            if ok then
+                spawned = spawned + 1
+            else
+                print("SpawnBots: CheatManager failed on try " .. i .. " -> " .. tostring(err))
+            end
+        end
+    else
+        print("SpawnBots: CheatManager not valid, trying ServerCheat")
+        for i = 1, BotsToSpawn do
+            local ok, err = pcall(function()
+                controller:ServerCheat("SpawnBot")
+            end)
+            if ok then
+                spawned = spawned + 1
+            else
+                print("SpawnBots: ServerCheat failed on try " .. i .. " -> " .. tostring(err))
+            end
+        end
+    end
+
+    if spawned > 0 then
+        BotsSpawned = true
+        print("SpawnBots: spawned " .. tostring(spawned) .. " bots")
+    else
+        print("SpawnBots: failed to spawn bots")
     end
 end
 
