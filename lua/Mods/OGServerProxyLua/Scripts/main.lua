@@ -1,4 +1,4 @@
--- UEHelpers = require("UEHelpers")
+local UEHelpers = require("UEHelpers")
 -- local UWorld = UEHelpers.GetWorld()
 
 ---@type ATslGameState
@@ -148,6 +148,12 @@ function Init()
             mode.WarmupTime = 200
             mode.bCanAllSpectate = false
             mode.MultiplierBlueZone = 1
+            mode.NumBots = BotsToSpawn
+            -- Enable perf bot logic to allow spawning extra controllers
+            mode.bEnablePerfBotLogin = true
+            mode.bEnablePerfBotInPIE = true
+            mode.bIsPerfBotSpawnToRandomPosition = true
+            mode.bCanRestartPerfBot = true
             -- Set the match to Airbrone
             mode.MatchStartType = 1
 
@@ -447,30 +453,30 @@ function SpawnBots(controller)
         return
     end
 
-    local spawned = 0
+    if not controller.CheatManager or not controller.CheatManager:IsValid() then
+        print("SpawnBots: waiting for CheatManager")
+        return
+    end
 
-    if controller.CheatManager and controller.CheatManager:IsValid() then
-        for i = 1, BotsToSpawn do
-            local ok, err = pcall(function()
-                controller.CheatManager:SpawnBot()
-            end)
-            if ok then
-                spawned = spawned + 1
-            else
-                print("SpawnBots: CheatManager failed on try " .. i .. " -> " .. tostring(err))
-            end
-        end
-    else
-        print("SpawnBots: CheatManager not valid, trying ServerCheat")
-        for i = 1, BotsToSpawn do
-            local ok, err = pcall(function()
-                controller:ServerCheat("SpawnBot")
-            end)
-            if ok then
-                spawned = spawned + 1
-            else
-                print("SpawnBots: ServerCheat failed on try " .. i .. " -> " .. tostring(err))
-            end
+    local gi = UEHelpers.GetGameInstance()
+    if not gi or not gi:IsValid() then
+        print("SpawnBots: GameInstance not valid")
+        return
+    end
+
+    local spawned = 0
+    for i = 1, BotsToSpawn do
+        pcall(function()
+            gi:DebugCreatePlayer(i)
+        end)
+
+        local ok, err = pcall(function()
+            controller.CheatManager:SpawnBot()
+        end)
+        if ok then
+            spawned = spawned + 1
+        else
+            print("SpawnBots: CheatManager failed on try " .. i .. " -> " .. tostring(err))
         end
     end
 
