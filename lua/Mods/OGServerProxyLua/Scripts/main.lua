@@ -628,6 +628,7 @@ end
 -- Register engine callbacks for our hooks
 RegisterHook("/Script/Engine.GameModeBase:K2_PostLogin", Hook_K2_PostLogin)
 RegisterHook("/Script/Engine.GameModeBase:K2_OnRestartPlayer", Hook_K2_OnRestartPlayer)
-RegisterHook("/Script/Engine.GameModeBase:K2_OnSetMatchState", Hook_K2_OnSetMatchState)
+-- K2_OnSetMatchState is defined on GameMode, not GameModeBase
+RegisterHook("/Script/Engine.GameMode:K2_OnSetMatchState", Hook_K2_OnSetMatchState)
 
 Init()
