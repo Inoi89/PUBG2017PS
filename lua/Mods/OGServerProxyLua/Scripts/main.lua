@@ -29,8 +29,6 @@ GameEnded = false
 BotsToSpawn = 10
 -- Tracks if we already attempted to spawn bots
 BotsSpawned = false
--- Cache the server player controller so we can use it in hooks
-ServerController = nil
 
 Debug = true
 
@@ -189,13 +187,18 @@ function Init()
                         local serverPlayer = FindFirstOf("TslPlayerController")
                         if serverPlayer:IsValid() and serverPlayer:HasAuthority() then
                             print("We are a server, continue to do our stuff")
-                            ServerController = serverPlayer
                         GlobalTransportAirplane = SpawnAircraft()
                         GlobalTransportAirplane:EnterAtEjectionArea()
+                        -- attempt to spawn bots once the plane exists
+                        SpawnBots(serverPlayer)
 
                             LoopAsync(
                                 100,
                                 function()
+                                    -- try spawning bots if it hasn't been done
+                                    if not BotsSpawned then
+                                        SpawnBots(serverPlayer)
+                                    end
                                     if (GameState ~= nil) then
                                         if (GameState.TotalWarningDuration ~= 0) then
                                             if (GameState.TotalWarningDuration ~= LastWarningTime) then
@@ -444,12 +447,16 @@ end
 
 -- Spawn a number of bots using different methods
 function SpawnBots(controller)
-    if BotsSpawned then return end
+    if BotsSpawned then
+        return
+    end
+
     if not controller or not controller:IsValid() then
         print("SpawnBots: controller invalid")
         return
     end
 
+<<<<<<< codex/найти-способы-спавна-бота-в-lua-для-pubg2017ps
     if not controller.CheatManager or not controller.CheatManager:IsValid() then
         print("SpawnBots: waiting for CheatManager")
         return
@@ -474,6 +481,67 @@ function SpawnBots(controller)
             spawned = spawned + 1
         else
             print("SpawnBots: CheatManager failed on try " .. i .. " -> " .. tostring(err))
+=======
+    local world = World
+    if not world or not world:IsValid() then
+        print("SpawnBots: world invalid")
+        return
+    end
+
+    print("SpawnBots: retrieving GameMode")
+    local mode = GamePlayStatics:GetGameMode(world)
+    if mode and mode:IsValid() then
+        mode.bEnablePerfBotLogin = true
+        mode.bEnablePerfBotInPIE = true
+        mode.bIsPerfBotSpawnToRandomPosition = true
+        mode.bCanRestartPerfBot = true
+        print("SpawnBots: perf bot flags enabled")
+    else
+        print("SpawnBots: GameMode not found")
+    end
+
+    local gameInstance = GamePlayStatics:GetGameInstance(world)
+    if gameInstance and gameInstance:IsValid() then
+        for i = 1, BotsToSpawn do
+            local ok, err = pcall(function()
+                gameInstance:DebugCreatePlayer(i)
+            end)
+            if ok then
+                print("SpawnBots: DebugCreatePlayer " .. i .. " succeeded")
+            else
+                print("SpawnBots: DebugCreatePlayer " .. i .. " failed -> " .. tostring(err))
+            end
+        end
+    else
+        print("SpawnBots: GameInstance not found for DebugCreatePlayer")
+    end
+
+    local spawned = 0
+    if controller.CheatManager and controller.CheatManager:IsValid() then
+        for i = 1, BotsToSpawn do
+            local ok, err = pcall(function()
+                controller.CheatManager:SpawnBot()
+            end)
+            if ok then
+                spawned = spawned + 1
+                print("SpawnBots: spawned bot " .. i)
+            else
+                print("SpawnBots: CheatManager failed on bot " .. i .. " -> " .. tostring(err))
+            end
+        end
+    else
+        print("SpawnBots: CheatManager not valid, trying ServerCheat")
+        for i = 1, BotsToSpawn do
+            local ok, err = pcall(function()
+                controller:ServerCheat("SpawnBot")
+            end)
+            if ok then
+                spawned = spawned + 1
+                print("SpawnBots: spawned bot " .. i .. " via ServerCheat")
+            else
+                print("SpawnBots: ServerCheat failed on bot " .. i .. " -> " .. tostring(err))
+            end
+>>>>>>> cversion
         end
     end
 
@@ -482,22 +550,6 @@ function SpawnBots(controller)
         print("SpawnBots: spawned " .. tostring(spawned) .. " bots")
     else
         print("SpawnBots: failed to spawn bots")
-    end
-end
-
--- Spawn bots after the first player successfully logs in
-function Hook_K2_PostLogin(object, func, param)
-    local pc = param:get()
-    print("K2_PostLogin::before " .. pc:GetFullName())
-    if GameState and GameState.NumJoinPlayers >= 1 and not BotsSpawned then
-        if not ServerController or not ServerController:IsValid() then
-            ServerController = pc
-        end
-        if ServerController and ServerController:IsValid() then
-            SpawnBots(ServerController)
-        else
-            print("Hook_K2_PostLogin: server controller invalid")
-        end
     end
 end
 
@@ -610,10 +662,5 @@ function Hook_K2_OnSetMatchState(object, func, param)
         end
     end
 end
-
--- Register engine callbacks for our hooks
-RegisterHook("/Script/Engine.GameModeBase:K2_PostLogin", Hook_K2_PostLogin)
-RegisterHook("/Script/Engine.GameModeBase:K2_OnRestartPlayer", Hook_K2_OnRestartPlayer)
-RegisterHook("/Script/Engine.GameModeBase:K2_OnSetMatchState", Hook_K2_OnSetMatchState)
 
 Init()
