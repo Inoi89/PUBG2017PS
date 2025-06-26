@@ -29,6 +29,7 @@ GameEnded = false
 BotsToSpawn = 10
 -- Tracks if we already attempted to spawn bots
 BotsSpawned = false
+BotSpawnLoopStarted = false
 -- Cache the server player controller so we can use it in hooks
 ServerController = nil
 
@@ -193,17 +194,7 @@ function Init()
                             GlobalTransportAirplane = SpawnAircraft()
                             GlobalTransportAirplane:EnterAtEjectionArea()
 
-                            -- try spawning bots periodically until success
-                            LoopAsync(
-                                100,
-                                function()
-                                    if not BotsSpawned and ServerController ~= nil then
-                                        SpawnBots(ServerController)
-                                    end
-                                    return not BotsSpawned
-                                end
-                            )
-
+                            -- start plane logic loop
                             LoopAsync(
                                 100,
                                 function()
@@ -484,6 +475,12 @@ function SpawnBots(controller)
         local ok, err = pcall(function()
             controller.CheatManager:SpawnBot()
         end)
+        if not ok then
+            -- Try using ServerCheat as a fallback
+            ok, err = pcall(function()
+                controller:ServerCheat("SpawnBot")
+            end)
+        end
         if ok then
             spawned = spawned + 1
         else
@@ -499,6 +496,21 @@ function SpawnBots(controller)
     end
 end
 
+-- Repeatedly attempt to spawn bots until success
+function StartBotSpawnLoop(controller)
+    if BotSpawnLoopStarted then return end
+    BotSpawnLoopStarted = true
+    LoopAsync(
+        100,
+        function()
+            if not BotsSpawned then
+                SpawnBots(controller)
+            end
+            return not BotsSpawned
+        end
+    )
+end
+
 -- Spawn bots after the first player successfully logs in
 function Hook_K2_PostLogin(object, func, param)
     local pc = param:get()
@@ -508,7 +520,7 @@ function Hook_K2_PostLogin(object, func, param)
             ServerController = pc
         end
         if ServerController and ServerController:IsValid() then
-            SpawnBots(ServerController)
+            StartBotSpawnLoop(ServerController)
         else
             print("Hook_K2_PostLogin: server controller invalid")
         end
