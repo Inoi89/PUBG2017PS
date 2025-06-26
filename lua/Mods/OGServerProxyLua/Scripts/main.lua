@@ -447,12 +447,16 @@ end
 
 -- Spawn a number of bots using different methods
 function SpawnBots(controller)
-    if BotsSpawned then return end
+    if BotsSpawned then
+        return
+    end
+
     if not controller or not controller:IsValid() then
         print("SpawnBots: controller invalid")
         return
     end
 
+<<<<<<< codex/найти-способы-спавна-бота-в-lua-для-pubg2017ps
     if not controller.CheatManager or not controller.CheatManager:IsValid() then
         print("SpawnBots: waiting for CheatManager")
         return
@@ -477,6 +481,67 @@ function SpawnBots(controller)
             spawned = spawned + 1
         else
             print("SpawnBots: CheatManager failed on try " .. i .. " -> " .. tostring(err))
+=======
+    local world = World
+    if not world or not world:IsValid() then
+        print("SpawnBots: world invalid")
+        return
+    end
+
+    print("SpawnBots: retrieving GameMode")
+    local mode = GamePlayStatics:GetGameMode(world)
+    if mode and mode:IsValid() then
+        mode.bEnablePerfBotLogin = true
+        mode.bEnablePerfBotInPIE = true
+        mode.bIsPerfBotSpawnToRandomPosition = true
+        mode.bCanRestartPerfBot = true
+        print("SpawnBots: perf bot flags enabled")
+    else
+        print("SpawnBots: GameMode not found")
+    end
+
+    local gameInstance = GamePlayStatics:GetGameInstance(world)
+    if gameInstance and gameInstance:IsValid() then
+        for i = 1, BotsToSpawn do
+            local ok, err = pcall(function()
+                gameInstance:DebugCreatePlayer(i)
+            end)
+            if ok then
+                print("SpawnBots: DebugCreatePlayer " .. i .. " succeeded")
+            else
+                print("SpawnBots: DebugCreatePlayer " .. i .. " failed -> " .. tostring(err))
+            end
+        end
+    else
+        print("SpawnBots: GameInstance not found for DebugCreatePlayer")
+    end
+
+    local spawned = 0
+    if controller.CheatManager and controller.CheatManager:IsValid() then
+        for i = 1, BotsToSpawn do
+            local ok, err = pcall(function()
+                controller.CheatManager:SpawnBot()
+            end)
+            if ok then
+                spawned = spawned + 1
+                print("SpawnBots: spawned bot " .. i)
+            else
+                print("SpawnBots: CheatManager failed on bot " .. i .. " -> " .. tostring(err))
+            end
+        end
+    else
+        print("SpawnBots: CheatManager not valid, trying ServerCheat")
+        for i = 1, BotsToSpawn do
+            local ok, err = pcall(function()
+                controller:ServerCheat("SpawnBot")
+            end)
+            if ok then
+                spawned = spawned + 1
+                print("SpawnBots: spawned bot " .. i .. " via ServerCheat")
+            else
+                print("SpawnBots: ServerCheat failed on bot " .. i .. " -> " .. tostring(err))
+            end
+>>>>>>> cversion
         end
     end
 
