@@ -1,4 +1,4 @@
--- UEHelpers = require("UEHelpers")
+local UEHelpers = require("UEHelpers")
 -- local UWorld = UEHelpers.GetWorld()
 
 ---@type ATslGameState
@@ -24,6 +24,13 @@ FNameAvailablie = false
 
 GameStarted = false
 GameEnded = false
+
+-- Number of bots we try to spawn when the server starts
+BotsToSpawn = 10
+-- Tracks if we already attempted to spawn bots
+BotsSpawned = false
+-- Cache the server player controller so we can use it in hooks
+ServerController = nil
 
 Debug = true
 
@@ -143,6 +150,12 @@ function Init()
             mode.WarmupTime = 200
             mode.bCanAllSpectate = false
             mode.MultiplierBlueZone = 1
+            mode.NumBots = BotsToSpawn
+            -- Enable perf bot logic to allow spawning extra controllers
+            mode.bEnablePerfBotLogin = true
+            mode.bEnablePerfBotInPIE = true
+            mode.bIsPerfBotSpawnToRandomPosition = true
+            mode.bCanRestartPerfBot = true
             -- Set the match to Airbrone
             mode.MatchStartType = 1
 
@@ -176,15 +189,24 @@ function Init()
                         local serverPlayer = FindFirstOf("TslPlayerController")
                         if serverPlayer:IsValid() and serverPlayer:HasAuthority() then
                             print("We are a server, continue to do our stuff")
+                            ServerController = serverPlayer
                             GlobalTransportAirplane = SpawnAircraft()
                             GlobalTransportAirplane:EnterAtEjectionArea()
-                            -- SpawnTestingPlayerPawn()
+
+                            -- try spawning bots periodically until success
+                            LoopAsync(
+                                100,
+                                function()
+                                    if not BotsSpawned and ServerController ~= nil then
+                                        SpawnBots(ServerController)
+                                    end
+                                    return not BotsSpawned
+                                end
+                            )
 
                             LoopAsync(
                                 100,
                                 function()
-                                    -- print("Spawning Bot...")
-                                    -- serverPlayer.CheatManager:SpawnBot()
                                     if (GameState ~= nil) then
                                         if (GameState.TotalWarningDuration ~= 0) then
                                             if (GameState.TotalWarningDuration ~= LastWarningTime) then
@@ -431,6 +453,68 @@ function SpawnAircraft()
     end
 end
 
+-- Spawn a number of bots using different methods
+function SpawnBots(controller)
+    if BotsSpawned then return end
+    if not controller or not controller:IsValid() then
+        print("SpawnBots: controller invalid")
+        return
+    end
+    if not controller:HasAuthority() then
+        print("SpawnBots: controller has no authority")
+        return
+    end
+    if not controller.CheatManager or not controller.CheatManager:IsValid() then
+        print("SpawnBots: waiting for CheatManager")
+        return
+    end
+
+    local gi = UEHelpers.GetGameInstance()
+    if not gi or not gi:IsValid() then
+        print("SpawnBots: GameInstance not valid")
+        return
+    end
+
+    local spawned = 0
+    for i = 1, BotsToSpawn do
+        pcall(function()
+            gi:DebugCreatePlayer(i)
+        end)
+
+        local ok, err = pcall(function()
+            controller.CheatManager:SpawnBot()
+        end)
+        if ok then
+            spawned = spawned + 1
+        else
+            print("SpawnBots: CheatManager failed on try " .. i .. " -> " .. tostring(err))
+        end
+    end
+
+    if spawned > 0 then
+        BotsSpawned = true
+        print("SpawnBots: spawned " .. tostring(spawned) .. " bots")
+    else
+        print("SpawnBots: failed to spawn bots")
+    end
+end
+
+-- Spawn bots after the first player successfully logs in
+function Hook_K2_PostLogin(object, func, param)
+    local pc = param:get()
+    print("K2_PostLogin::before " .. pc:GetFullName())
+    if GameState and GameState.NumJoinPlayers >= 1 and not BotsSpawned then
+        if not ServerController or not ServerController:IsValid() then
+            ServerController = pc
+        end
+        if ServerController and ServerController:IsValid() then
+            SpawnBots(ServerController)
+        else
+            print("Hook_K2_PostLogin: server controller invalid")
+        end
+    end
+end
+
 function Hook_K2_OnRestartPlayer(object, func, param)
     local player = param:get()
     print("K2_OnRestartPlayer::before" .. player:K2_GetPawn():GetFName():ToString())
@@ -540,5 +624,10 @@ function Hook_K2_OnSetMatchState(object, func, param)
         end
     end
 end
+
+-- Register engine callbacks for our hooks
+RegisterHook("/Script/Engine.GameModeBase:K2_PostLogin", Hook_K2_PostLogin)
+RegisterHook("/Script/Engine.GameModeBase:K2_OnRestartPlayer", Hook_K2_OnRestartPlayer)
+RegisterHook("/Script/Engine.GameModeBase:K2_OnSetMatchState", Hook_K2_OnSetMatchState)
 
 Init()
